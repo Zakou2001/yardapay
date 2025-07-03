@@ -67,6 +67,7 @@
         <th>Frais</th>
         <th>Reçu</th>
         <th>Moyen</th>
+        <th>Action</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -122,6 +123,10 @@ async function fetchTransferts(filters = {}) {
         <td>${t.frais.toFixed(2)} €</td>
         <td>${t.montant_recu.toFixed(2)} €</td>
         <td>${t.moyen}</td>
+        <td>
+        <button onclick="modifierTransfert(${t.id})">✏️</button>
+        <button onclick="supprimerTransfert(${t.id})">🗑️</button>
+      </td>
       </tr>
     `;
   }).join('');
@@ -167,9 +172,44 @@ document.getElementById('filtreForm').onsubmit = (e) => {
     client_id: form.get('client_id_filter')
   });
 };
+async function supprimerTransfert(id) {
+  if (!confirm("Supprimer ce transfert ?")) return;
+
+  const res = await fetch(`/api/transferts/${id}`, {
+    method: 'DELETE'
+  });
+
+  if (res.ok) {
+    alert("Transfert supprimé !");
+    fetchTransferts(); // Recharge
+  } else {
+    const err = await res.json();
+    alert("Erreur : " + err.message);
+  }
+}
+async function modifierTransfert(id) {
+  const nouveauMontant = prompt("Nouveau montant envoyé :");
+  if (nouveauMontant === null) return;
+
+  const res = await fetch(`/api/transferts/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ montant_envoye: parseFloat(nouveauMontant) })
+  });
+
+  if (res.ok) {
+    alert("Transfert modifié !");
+    fetchTransferts(); // Recharge
+  } else {
+    const err = await res.json();
+    alert("Erreur : " + err.message);
+  }
+}
+
+
 function logout() {
   localStorage.removeItem('isAdmin');
-  location.reload(); // ou redirection vers la page de login
+  location.reload(); 
 }
 function telechargerCSV() {
   let rows = Array.from(transfertsTable.querySelectorAll('tr'));
