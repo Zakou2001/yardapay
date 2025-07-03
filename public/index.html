@@ -17,7 +17,7 @@
   <!-- En-tête Yardapay -->
 <header style="display: flex; align-items: center; gap: 1rem; padding: 10px 20px; background: #1B9C85; color:#f5f5f5">
   <img src="logo.png" alt="Yardapay" style="height: 100px;" />
-  <h1 style="margin: 0; font-size: 1.8rem; color: #333;"> 🏦 Yardapay Backoffice</h1>
+  <h1 style="margin: 0; font-size: 1.8rem; color: #333;"> 🏦 Yardapay Backoffice</h1> <button onclick="logout()" style="float: right;">🔓 Déconnexion</button>
 </header>
 
 <div id="auth" style="background: #eee; padding: 1rem;">
@@ -86,6 +86,8 @@
 function checkPass() {
   const pass = document.getElementById('pass').value;
   if (pass === 'admin123') {
+    // après login réussi
+    localStorage.setItem('isAdmin', 'true');
     document.getElementById('auth').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     fetchClients();
@@ -165,6 +167,10 @@ document.getElementById('filtreForm').onsubmit = (e) => {
     client_id: form.get('client_id_filter')
   });
 };
+function logout() {
+  localStorage.removeItem('isAdmin');
+  location.reload(); // ou redirection vers la page de login
+}
 function telechargerCSV() {
   let rows = Array.from(transfertsTable.querySelectorAll('tr'));
   let csv = "Date,Client,Montant,Frais,Reçu,Moyen\n";
