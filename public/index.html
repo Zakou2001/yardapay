@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Yardapay Dashboard</title>
+  <style>
+    body { font-family: Arial; max-width: 800px; margin: auto; padding: 2rem; }
+    h1, h2 { color: #007acc; }
+    table, th, td { border: 1px solid #ccc; border-collapse: collapse; padding: 0.5rem; }
+    form { margin-bottom: 2rem; background: #f5f5f5; padding: 1rem; border-radius: 8px; }
+    input, select { margin: 0.2rem 0; padding: 0.4rem; width: 100%; }
+    button { padding: 0.6rem; background-color: #007acc; color: white; border: none; cursor: pointer; }
+    button:hover { background-color: #005fa3; }
+  </style>
+</head>
+<body>
+  <!-- En-tête Yardapay -->
+<header style="display: flex; align-items: center; gap: 1rem; padding: 10px 20px; background: #1B9C85; color:#f5f5f5">
+  <img src="logo.png" alt="Yardapay" style="height: 100px;" />
+  <h1 style="margin: 0; font-size: 1.8rem; color: #333;"> 🏦 Yardapay Backoffice</h1>
+</header>
+
+<div id="auth" style="background: #eee; padding: 1rem;">
+  <h2>Connexion Admin</h2>
+  <input type="password" id="pass" placeholder="Mot de passe" />
+  <button onclick="checkPass()">Se connecter</button>
+  <p id="authMsg" style="color: red;"></p>
+</div>
+
+<div id="app" style="display: none;">
+
+  <h2>Créer un client</h2>
+  <form id="clientForm">
+    <input type="text" name="nom" placeholder="Nom du client" required />
+    <input type="text" name="pays" placeholder="Pays" required />
+    <button type="submit">Ajouter le client</button>
+  </form>
+
+  <h2>Créer un transfert</h2>
+  <form id="transfertForm">
+    <select name="client_id" required></select>
+    <input type="number" name="montant_envoye" placeholder="Montant envoyé (€)" required />
+    <input type="text" name="pays_origine" placeholder="Pays d'origine" required />
+    <input type="text" name="pays_destination" placeholder="Pays de destination" required />
+    <input type="text" name="moyen" placeholder="Moyen (Wero, SEPA, Mynita,...)" required />
+    <button type="submit">Envoyer l'argent</button>
+  </form>
+
+<h2>🔍 Filtrer les transferts</h2>
+<form id="filtreForm">
+  <label>Date (YYYY-MM-DD) : <input type="date" name="date" /></label>
+  <label>Client :
+    <select name="client_id_filter">
+      <option value="">-- Tous les clients --</option>
+    </select>
+  </label>
+  <button type="submit">Filtrer</button>
+</form>
+
+  <h2>📋 Liste des transferts</h2>
+  <table id="transfertsTable">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Client</th>
+        <th>Montant</th>
+        <th>Frais</th>
+        <th>Reçu</th>
+        <th>Moyen</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <br>
+  <button onclick="telechargerCSV()">📥 Télécharger en CSV</button>
+
+  <h3>Total des frais encaissés : <span id="totalFrais">0 €</span></h3>
+</div>
+  <script>
+    const clientSelect = document.querySelector('select[name="client_id"]');
+    const clientForm = document.getElementById('clientForm');
+    const transfertForm = document.getElementById('transfertForm');
+    const transfertsTable = document.getElementById('transfertsTable').querySelector('tbody');
+    const totalFraisSpan = document.getElementById('totalFrais');
+function checkPass() {
+  const pass = document.getElementById('pass').value;
+  if (pass === 'admin123') {
+    document.getElementById('auth').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    fetchClients();
+    fetchTransferts();
+  } else {
+    document.getElementById('authMsg').textContent = 'Mot de passe incorrect';
+  }
+}
+
+async function fetchClients() {
+  const res = await fetch('/api/clients');
+  const clients = await res.json();
+  clientSelect.innerHTML = clients.map(c => `<option value="${c.id}">${c.nom} (${c.pays})</option>`).join('');
+  const clientFilter = document.querySelector('select[name="client_id_filter"]');
+  clientFilter.innerHTML += clients.map(c => `<option value="${c.id}">${c.nom} (${c.pays})</option>`).join('');
+}
+
+
+async function fetchTransferts(filters = {}) {
+  let query = new URLSearchParams(filters).toString();
+  const res = await fetch(`/api/transferts?${query}`);
+  const transferts = await res.json();
+
+  let totalFrais = 0;
+  transfertsTable.innerHTML = transferts.map(t => {
+    totalFrais += t.frais;
+    return `
+      <tr>
+        <td>${t.date}</td>
+        <td>${t.client_nom}</td>
+        <td>${t.montant_envoye} €</td>
+        <td>${t.frais.toFixed(2)} €</td>
+        <td>${t.montant_recu.toFixed(2)} €</td>
+        <td>${t.moyen}</td>
+      </tr>
+    `;
+  }).join('');
+  totalFraisSpan.textContent = `${totalFrais.toFixed(2)} €`;
+}
+
+
+    clientForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const form = new FormData(clientForm);
+      await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nom: form.get('nom'), pays: form.get('pays') })
+      });
+      clientForm.reset();
+      fetchClients();
+    };
+
+    transfertForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const form = new FormData(transfertForm);
+      const data = {
+        client_id: form.get('client_id'),
+        montant_envoye: parseFloat(form.get('montant_envoye')),
+        pays_origine: form.get('pays_origine'),
+        pays_destination: form.get('pays_destination'),
+        moyen: form.get('moyen')
+      };
+      await fetch('/api/transferts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      transfertForm.reset();
+      fetchTransferts();
+    };
+document.getElementById('filtreForm').onsubmit = (e) => {
+  e.preventDefault();
+  const form = new FormData(e.target);
+  fetchTransferts({
+    date: form.get('date'),
+    client_id: form.get('client_id_filter')
+  });
+};
+function telechargerCSV() {
+  let rows = Array.from(transfertsTable.querySelectorAll('tr'));
+  let csv = "Date,Client,Montant,Frais,Reçu,Moyen\n";
+
+  rows.forEach(row => {
+    let cols = Array.from(row.querySelectorAll('td')).map(td => td.textContent);
+    if (cols.length) csv += cols.join(",") + "\n";
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'transferts_yardapay.csv';
+  a.click();
+}
+
+    fetchClients();
+    fetchTransferts();
+  </script>
+</body>
+</html>
